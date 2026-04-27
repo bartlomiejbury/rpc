@@ -34,9 +34,13 @@ class RPCPubSubClient:
             resp = self.req.recv_json()
         except zmq.Again:
             raise TimeoutError(f"RPC call '{method}' timed out after {timeout_ms} ms")
-        error = resp.get("error")
-        if error is not None:
-            raise Exception(error if error else "empty error message")
+
+        # Check errorCode (0 = success)
+        error_code = resp.get("errorCode", 0)
+        if error_code != 0:
+            error_msg = resp.get("errorMsg", "unknown error")
+            raise Exception(f"RPC error (code {error_code}): {error_msg}")
+
         return resp.get("result")
 
     def __getattr__(self, name):

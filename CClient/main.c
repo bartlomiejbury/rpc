@@ -15,11 +15,22 @@ int main() {
     struct event *sub_event = rpc_client_add_to_loop(client, base);
 
     char resp1[128], resp2[128];
-    rpc_call(client,3000,resp1,sizeof(resp1), NULL, 0, "add", "ii", 5,3);
-    printf("add(5,3) = %s\n",resp1);
+    char err1[256], err2[256];
+    int code1 = 0, code2 = 0;
 
-    rpc_call(client,3000,resp2,sizeof(resp2), NULL, 0, "multiply", "ii", 4,2);
-    printf("multiply(4,2) = %s\n",resp2);
+    int rc1 = rpc_call(client,3000,resp1,sizeof(resp1), err1, sizeof(err1), &code1, "add", "ii", 5,3);
+    if(rc1 == RPC_RESULT_OK && code1 == 0) {
+        printf("add(5,3) = %s\n",resp1);
+    } else {
+        printf("add(5,3) failed: errorCode=%d, errorMsg=%s\n", code1, err1);
+    }
+
+    int rc2 = rpc_call(client,3000,resp2,sizeof(resp2), err2, sizeof(err2), &code2, "multiply", "ii", 4,2);
+    if(rc2 == RPC_RESULT_OK && code2 == 0) {
+        printf("multiply(4,2) = %s\n",resp2);
+    } else {
+        printf("multiply(4,2) failed: errorCode=%d, errorMsg=%s\n", code2, err2);
+    }
 
     event_base_dispatch(base);
     rpc_client_free(client);

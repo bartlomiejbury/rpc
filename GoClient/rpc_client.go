@@ -90,14 +90,19 @@ func (c *RPCPubSubClient) Call(timeoutMs int, method string, params ...interface
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	if response["error"] != nil {
-        if errMsg, ok := response["error"].(string); ok {
-            if errMsg == "" {
-                return nil, fmt.Errorf("RPC error: empty error message")
-            }
-            return nil, fmt.Errorf("RPC error: %s", errMsg)
-        }
-        return nil, fmt.Errorf("RPC error: invalid error type")
+	// Check errorCode (0 = success)
+	errorCode := 0
+	if code, ok := response["errorCode"].(float64); ok {
+		errorCode = int(code)
+	}
+
+	if errorCode != 0 {
+		// Get optional error message
+		errorMsg := "unknown error"
+		if msg, ok := response["errorMsg"].(string); ok && msg != "" {
+			errorMsg = msg
+		}
+		return nil, fmt.Errorf("RPC error (code %d): %s", errorCode, errorMsg)
 	}
 
 	return response["result"], nil

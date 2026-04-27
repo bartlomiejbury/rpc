@@ -47,25 +47,25 @@ class RPCServer:
                     try:
                         req = json.loads(msg)
                     except json.JSONDecodeError:
-                        self.rep.send_json({"result": None, "error": "invalid json"})
+                        self.rep.send_json({"result": None, "errorCode": 2, "errorMsg": "invalid json"})
                         continue
 
                     method = req.get("method")
                     if not method:
-                        self.rep.send_json({"result": None, "error": "missing method"})
+                        self.rep.send_json({"result": None, "errorCode": 1, "errorMsg": "missing method"})
                         continue
 
                     params = req.get("params", [])
 
                     if method not in self.funcs:
-                        self.rep.send_json({"result": None, "error": "unknown method"})
+                        self.rep.send_json({"result": None, "errorCode": 3, "errorMsg": "unknown method"})
                         continue
 
                     try:
                         result = self.funcs[method](params)
-                        self.rep.send_json({"result": result, "error": None})
+                        self.rep.send_json({"result": result, "errorCode": 0, "errorMsg": None})
                     except Exception as e:
-                        self.rep.send_json({"result": None, "error": str(e)})
+                        self.rep.send_json({"result": None, "errorCode": 1, "errorMsg": str(e)})
 
             except zmq.ZMQError as e:
                 if not self.stop_flag.is_set():

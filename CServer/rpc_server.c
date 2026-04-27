@@ -52,7 +52,7 @@ static void* rpc_loop(void *arg) {
         yyjson_doc *doc = yyjson_read((char*)request_str, request_len, 0);
         if (!doc) {
             zmq_msg_close(&msg);
-            zmq_send(s->rep, "{\"result\":null,\"error\":\"invalid json\"}", 39, 0);
+            zmq_send(s->rep, "{\"result\":null,\"errorCode\":2,\"errorMsg\":\"invalid json\"}", 59, 0);
             continue;
         }
 
@@ -62,7 +62,7 @@ static void* rpc_loop(void *arg) {
         if (!method_val || !yyjson_is_str(method_val)) {
             yyjson_doc_free(doc);
             zmq_msg_close(&msg);
-            zmq_send(s->rep, "{\"result\":null,\"error\":\"missing method\"}", 41, 0);
+            zmq_send(s->rep, "{\"result\":null,\"errorCode\":1,\"errorMsg\":\"missing method\"}", 61, 0);
             continue;
         }
 
@@ -84,25 +84,32 @@ static void* rpc_loop(void *arg) {
         if (!handler) {
             yyjson_doc_free(doc);
             zmq_msg_close(&msg);
-            zmq_send(s->rep, "{\"result\":null,\"error\":\"unknown method\"}", 42, 0);
+            zmq_send(s->rep, "{\"result\":null,\"errorCode\":3,\"errorMsg\":\"unknown method\"}", 62, 0);
             continue;
         }
 
         // Call the handler (pass JSON params directly)
         yyjson_mut_doc *resp_doc = yyjson_mut_doc_new(NULL);
-        char err_buf[256] = {0};
-        yyjson_mut_val *result = handler(resp_doc, params_val, user_data, err_buf, sizeof(err_buf));
+        yyjson_mut_val *result = NULL;
+        char err_msg[256] = {0};
+        int error_code = handler(resp_doc, params_val, user_data, &result, err_msg, sizeof(err_msg));
 
         // Build response
         yyjson_mut_val *resp_root = yyjson_mut_obj(resp_doc);
         yyjson_mut_doc_set_root(resp_doc, resp_root);
 
-        if (err_buf[0] != '\0' || result == NULL) {
-            yyjson_mut_obj_add_null(resp_doc, resp_root, "result");
-            yyjson_mut_obj_add_str(resp_doc, resp_root, "error", err_buf[0] ? err_buf : "handler returned null");
+        // Add result (create null if error occurred or handler didn't set result)
+        if (error_code != 0 || result == NULL) {
+            result = yyjson_mut_null(resp_doc);
+        }
+        yyjson_mut_obj_add_val(resp_doc, resp_root, "result", result);
+
+        // Add error fields
+        yyjson_mut_obj_add_int(resp_doc, resp_root, "errorCode", error_code);
+        if (err_msg[0] != '\0') {
+            yyjson_mut_obj_add_str(resp_doc, resp_root, "errorMsg", err_msg);
         } else {
-            yyjson_mut_obj_add_val(resp_doc, resp_root, "result", result);
-            yyjson_mut_obj_add_null(resp_doc, resp_root, "error");
+            yyjson_mut_obj_add_null(resp_doc, resp_root, "errorMsg");
         }
 
         // Serialize response
@@ -146,12 +153,13 @@ RPCServer* rpc_server_new(const char *name) {
     return s;
 }
 
-void rpc_server_register(RPCServer *s, const char *name, rpc_handler_t handler) {
+void rpc_server_register(RPCServer *s, const char *name, rpc_handler_t handler, void *user_data) {
     if (!s || s->func_count >= MAX_FUNCS) return;
 
     pthread_mutex_lock(&s->mutex);
     strncpy(s->funcs[s->func_count].name, name, MAX_NAME_LEN - 1);
     s->funcs[s->func_count].handler = handler;
+    s->funcs[s->func_count].user_data = user_data;
     s->func_count++;
     pthread_mutex_unlock(&s->mutex);
 }

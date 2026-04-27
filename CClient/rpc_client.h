@@ -28,13 +28,17 @@ struct event* rpc_client_add_to_loop(RPCPubSubClient *c, struct event_base *base
 // Handle subscribe events (internal)
 void handle_sub_event(RPCPubSubClient *c);
 
-// Send an RPC request (internal)
+// Send an RPC request
+// Returns RPC_RESULT_OK on success, error code on failure
+// If server returns an error, RPC_RESULT_RPC_ERR is returned and err buffer contains errorMsg
+// resp_code: optional pointer to store server's errorCode (can be NULL)
 int rpc_call(RPCPubSubClient *c,
              int timeout_ms,
              char *resp,
              size_t resp_size,
              char *err,
              size_t err_size,
+             int *resp_code,
              const char *method,
              const char *fmt,
              ...);

@@ -73,29 +73,34 @@ func (s *RPCServer) rpcLoop() {
 
 			var req map[string]interface{}
 			if err := json.Unmarshal([]byte(msg), &req); err != nil {
-				s.rep.Send(`{"result":null,"error":"invalid json"}`, 0)
+				s.rep.Send(`{"result":null,"errorCode":2,"errorMsg":"invalid json"}`, 0)
 				continue
 			}
 
 			method, ok := req["method"].(string)
 			if !ok {
-				s.rep.Send(`{"result":null,"error":"missing method"}`, 0)
+				s.rep.Send(`{"result":null,"errorCode":1,"errorMsg":"missing method"}`, 0)
 				continue
 			}
 
 			params, _ := req["params"].([]interface{})
 			fn, exists := s.funcs[method]
 			if !exists {
-				s.rep.Send(`{"result":null,"error":"unknown method"}`, 0)
+				s.rep.Send(`{"result":null,"errorCode":3,"errorMsg":"unknown method"}`, 0)
 				continue
 			}
 
 			result, err := fn(params)
-			resp := map[string]interface{}{"result": result}
+			resp := map[string]interface{}{
+				"result": result,
+			}
 			if err != nil {
-				resp["error"] = err.Error()
+				resp["errorCode"] = 1
+				resp["errorMsg"] = err.Error()
+				resp["result"] = nil
 			} else {
-				resp["error"] = nil
+				resp["errorCode"] = 0
+				resp["errorMsg"] = nil
 			}
 			data, _ := json.Marshal(resp)
 			s.rep.Send(string(data), 0)

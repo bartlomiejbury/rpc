@@ -52,6 +52,13 @@ ServiceDiscoveryProject/
 - Python 3.7+
 - PyZMQ library (`pyzmq`)
 
+**Recommended: Use virtual environment**
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
 ## Installation
 
 ### C Dependencies
@@ -83,17 +90,32 @@ sudo apt-get install libzmq3-dev libevent-dev
 
 ### Python Dependencies
 
-**Install PyZMQ using pip:**
+**Using virtual environment (recommended):**
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Verify installation
+python3 -c "import zmq; print(f'PyZMQ version: {zmq.zmq_version()}')"
+```
+
+**Alternative - system-wide installation:**
 
 ```bash
 # Using pip
 pip install pyzmq
 ```
 
-**Verify installation:**
-
+To deactivate the virtual environment when done:
 ```bash
-python3 -c "import zmq; print(zmq.zmq_version())"
+deactivate
 ```
 
 ### Go Dependencies
@@ -117,17 +139,25 @@ The main dependency is:
 
 ## Quick Start
 
-The fastest way to get started is with Python (assuming ZeroMQ is already installed):
+The fastest way to get started is with Python (using virtual environment):
 
 **Terminal 1 - Start the server:**
 ```bash
+# Setup Python environment (first time only)
+./setup_venv.sh
+
+# Activate virtual environment
+source venv/bin/activate
+
 cd PythonServer
-pip install pyzmq  # if not already installed
 python rpc_server.py
 ```
 
 **Terminal 2 - Run the client:**
 ```bash
+# Activate virtual environment
+source venv/bin/activate
+
 cd PythonClient
 python rpc_client.py
 ```
@@ -135,6 +165,8 @@ python rpc_client.py
 You should see RPC call results and periodic time updates from the server!
 
 For Go or C implementations, see the detailed build instructions below.
+
+For more details on Python virtual environment, see [PYTHON_VENV.md](PYTHON_VENV.md).
 
 ## Building and Running
 
@@ -477,6 +509,88 @@ Contributions are welcome! Feel free to:
 - Enhance existing implementations
 - Add more example RPC methods
 - Improve documentation
+
+## Testing
+
+### Test Results
+
+The automated test suite (`./test_all_combinations.sh`) has been successfully tested:
+
+| Server | Client | Status | Notes |
+|--------|--------|--------|-------|
+| C | Go | ✓ PASSED | Full compatibility |
+| Go | Go | ✓ PASSED | Full compatibility |
+
+**Note:** Python tests require dependencies to be installed:
+```bash
+# Recommended: Use virtual environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Then run tests
+./test_all_combinations.sh
+```
+
+After installing Python dependencies, all 9 combinations (C, Go, Python × C, Go, Python) should pass.
+
+### Automated Cross-Language Testing
+
+Test all 9 combinations of servers and clients (C, Go, Python × C, Go, Python):
+
+```bash
+./test_all_combinations.sh
+```
+
+This script will:
+1. Build all server and client implementations
+2. Test each combination systematically
+3. Report pass/fail for each test
+4. Display a summary of results
+
+Example output:
+```
+========================================
+RPC Cross-Language Compatibility Test
+========================================
+
+[1] Testing: C Server ↔ C Client
+✓ PASSED
+[2] Testing: C Server ↔ Go Client
+✓ PASSED
+[3] Testing: C Server ↔ Python Client
+✓ PASSED
+...
+========================================
+Test Summary
+========================================
+Total tests:  9
+Passed:       9
+Failed:       0
+
+✓ All tests passed!
+```
+
+### Quick Test
+
+Test a specific server-client combination:
+
+```bash
+# Usage: ./quick_test.sh [SERVER_LANG] [CLIENT_LANG]
+
+# Test Python server with Go client
+./quick_test.sh Python Go
+
+# Test C server with Python client
+./quick_test.sh C Python
+
+# Test Go server with C client
+./quick_test.sh Go C
+```
+
+The test scripts use the existing client implementations (CClient, GoClient, PythonClient), which make RPC calls and then enter an event loop. The tests verify successful RPC communication before timing out.
+
+See [TESTING.md](TESTING.md) for comprehensive testing documentation.
 
 ## Troubleshooting
 

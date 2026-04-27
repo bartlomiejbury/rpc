@@ -196,7 +196,8 @@ static int rpc_recv(RPCPubSubClient *c,
              char *resp,
              size_t resp_size,
              char *err,
-             size_t err_size)
+             size_t err_size,
+             int *resp_code)
 {
     zmq_setsockopt(c->req,ZMQ_RCVTIMEO,&timeout_ms,sizeof(timeout_ms));
 
@@ -228,20 +229,35 @@ static int rpc_recv(RPCPubSubClient *c,
     yyjson_val *root = yyjson_doc_get_root(doc);
 
     yyjson_val *result = yyjson_obj_get(root,"result");
-    yyjson_val *error  = yyjson_obj_get(root,"error");
+    yyjson_val *error_code_val = yyjson_obj_get(root,"errorCode");
+    yyjson_val *error_msg_val = yyjson_obj_get(root,"errorMsg");
 
     int rc = RPC_RESULT_OK;
+    int error_code = 0;
 
-    if(error && !yyjson_is_null(error)) {
-        if(yyjson_is_str(error) && err != NULL && err_size > 0)
+    // Get error code
+    if(error_code_val && yyjson_is_int(error_code_val)) {
+        error_code = yyjson_get_int(error_code_val);
+    }
+
+    // Store error code if caller wants it
+    if(resp_code != NULL) {
+        *resp_code = error_code;
+    }
+
+    // Check if there was an error
+    if(error_code != 0) {
+        // Copy error message if provided
+        if(error_msg_val && yyjson_is_str(error_msg_val) && err != NULL && err_size > 0)
         {
-            const char *err_msg = yyjson_get_str(error);
+            const char *err_msg = yyjson_get_str(error_msg_val);
             strncpy(err,err_msg,err_size-1);
             err[err_size-1] = 0;
         }
         rc = RPC_RESULT_RPC_ERR;
     }
 
+    // Copy result
     if(result)
     {
         char *r = yyjson_val_write(result,0,NULL);
@@ -262,6 +278,7 @@ int rpc_call(RPCPubSubClient *c,
              size_t resp_size,
              char *err,
              size_t err_size,
+             int *resp_code,
              const char *method,
              const char *fmt,
              ...)
@@ -278,7 +295,7 @@ int rpc_call(RPCPubSubClient *c,
     if(rc != RPC_RESULT_OK)
         return rc;
 
-    return rpc_recv(c,timeout_ms,resp,resp_size,err,err_size);
+    return rpc_recv(c,timeout_ms,resp,resp_size,err,err_size,resp_code);
 }
 
 void rpc_client_free(RPCPubSubClient *c)

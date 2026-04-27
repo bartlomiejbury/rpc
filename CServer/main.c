@@ -13,17 +13,20 @@ void signal_handler(int sig) {
 }
 
 // RPC handler for "add"
-yyjson_mut_val* add_handler(yyjson_mut_doc *doc, yyjson_val *params, char *err_buf, size_t err_size) {
+int add_handler(yyjson_mut_doc *doc, yyjson_val *params, void *user_data,
+                yyjson_mut_val **result, char *err_msg, size_t err_msg_size) {
+    (void)user_data;
+
     // Check if params is an array
     if (!params || !yyjson_is_arr(params)) {
-        snprintf(err_buf, err_size, "add requires an array of parameters");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "add requires an array of parameters");
+        return 1;
     }
 
     size_t param_count = yyjson_arr_size(params);
     if (param_count < 2) {
-        snprintf(err_buf, err_size, "add requires 2 parameters");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "add requires 2 parameters");
+        return 1;
     }
 
     // Get parameters - support both int and float
@@ -31,65 +34,75 @@ yyjson_mut_val* add_handler(yyjson_mut_doc *doc, yyjson_val *params, char *err_b
     yyjson_val *p1 = yyjson_arr_get(params, 1);
 
     if (!yyjson_is_num(p0) || !yyjson_is_num(p1)) {
-        snprintf(err_buf, err_size, "add requires numeric parameters");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "add requires numeric parameters");
+        return 1;
     }
 
     double a = yyjson_get_num(p0);
     double b = yyjson_get_num(p1);
-    double result = a + b;
+    double sum = a + b;
 
     // Return as integer if both inputs were integers and result is whole
     if (yyjson_is_int(p0) && yyjson_is_int(p1)) {
-        return yyjson_mut_int(doc, (int)result);
+        *result = yyjson_mut_int(doc, (int)sum);
+    } else {
+        *result = yyjson_mut_real(doc, sum);
     }
-    return yyjson_mut_real(doc, result);
+    return 0;
 }
 
 // RPC handler for "multiply"
-yyjson_mut_val* multiply_handler(yyjson_mut_doc *doc, yyjson_val *params, char *err_buf, size_t err_size) {
+int multiply_handler(yyjson_mut_doc *doc, yyjson_val *params, void *user_data,
+                     yyjson_mut_val **result, char *err_msg, size_t err_msg_size) {
+    (void)user_data;
+
     if (!params || !yyjson_is_arr(params)) {
-        snprintf(err_buf, err_size, "multiply requires an array of parameters");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "multiply requires an array of parameters");
+        return 1;
     }
 
     size_t param_count = yyjson_arr_size(params);
     if (param_count < 2) {
-        snprintf(err_buf, err_size, "multiply requires 2 parameters");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "multiply requires 2 parameters");
+        return 1;
     }
 
     yyjson_val *p0 = yyjson_arr_get(params, 0);
     yyjson_val *p1 = yyjson_arr_get(params, 1);
 
     if (!yyjson_is_num(p0) || !yyjson_is_num(p1)) {
-        snprintf(err_buf, err_size, "multiply requires numeric parameters");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "multiply requires numeric parameters");
+        return 1;
     }
 
     double a = yyjson_get_num(p0);
     double b = yyjson_get_num(p1);
-    double result = a * b;
+    double product = a * b;
 
     // Return as integer if both inputs were integers and result is whole
     if (yyjson_is_int(p0) && yyjson_is_int(p1)) {
-        return yyjson_mut_int(doc, (int)result);
+        *result = yyjson_mut_int(doc, (int)product);
+    } else {
+        *result = yyjson_mut_real(doc, product);
     }
-    return yyjson_mut_real(doc, result);
+    return 0;
 }
 
 // Example handler that accepts flexible parameter types
 // Demonstrates: variable number of params, string handling, mixed types
-yyjson_mut_val* greet_handler(yyjson_mut_doc *doc, yyjson_val *params, char *err_buf, size_t err_size) {
+int greet_handler(yyjson_mut_doc *doc, yyjson_val *params, void *user_data,
+                  yyjson_mut_val **result, char *err_msg, size_t err_msg_size) {
+    (void)user_data;
+
     if (!params || !yyjson_is_arr(params)) {
-        snprintf(err_buf, err_size, "greet requires an array of parameters");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "greet requires an array of parameters");
+        return 1;
     }
 
     size_t count = yyjson_arr_size(params);
     if (count < 1) {
-        snprintf(err_buf, err_size, "greet requires at least 1 parameter (name)");
-        return NULL;
+        snprintf(err_msg, err_msg_size, "greet requires at least 1 parameter (name)");
+        return 1;
     }
 
     // Get first param as name (can be string or convert number to string)
@@ -113,14 +126,14 @@ yyjson_mut_val* greet_handler(yyjson_mut_doc *doc, yyjson_val *params, char *err
     }
 
     // Build result as JSON object
-    yyjson_mut_val *result = yyjson_mut_obj(doc);
-    yyjson_mut_obj_add_str(doc, result, "greeting", "Hello");
-    yyjson_mut_obj_add_str(doc, result, "name", name_buf);
+    *result = yyjson_mut_obj(doc);
+    yyjson_mut_obj_add_str(doc, *result, "greeting", "Hello");
+    yyjson_mut_obj_add_str(doc, *result, "name", name_buf);
     if (age > 0) {
-        yyjson_mut_obj_add_int(doc, result, "age", age);
+        yyjson_mut_obj_add_int(doc, *result, "age", age);
     }
 
-    return result;
+    return 0;
 }
 
 int main() {
@@ -136,9 +149,9 @@ int main() {
     }
 
     // Register RPC functions
-    rpc_server_register(server, "add", add_handler);
-    rpc_server_register(server, "multiply", multiply_handler);
-    rpc_server_register(server, "greet", greet_handler);  // Demo: flexible params
+    rpc_server_register(server, "add", add_handler, NULL);
+    rpc_server_register(server, "multiply", multiply_handler, NULL);
+    rpc_server_register(server, "greet", greet_handler, NULL);  // Demo: flexible params
 
     // Start server
     if (rpc_server_start(server) != 0) {

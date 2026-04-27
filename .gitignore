@@ -1,0 +1,16 @@
+build/
+goclient
+goserver
+go.sum
+
+# Python
+venv/
+env/
+*.pyc
+__pycache__/
+*.pyo
+*.egg-info/
+.Python
+
+# Test outputs
+/tmp/*.log
